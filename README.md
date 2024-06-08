@@ -1,8 +1,3 @@
----
-title: "Kaikkien aikojen EM-futisveikkaus 2024"
-output: html_document
----
-
 Kilpailu koostuu alkulohkojen otteluiden tulosten ja lohkosijoitusten veikkaamisesta ja pudotuspelipuun muodostamisesta (ns. [bracket](https://fi.wikipedia.org/wiki/Jalkapallon_Euroopan-mestaruuskilpailut_2024#Pudotuspelit) sekä palkittavien pelaajien valinnoista. Kaikki valinnat tehdään viimeistään ennen turnauksen ensimmäistä ottelua.
 
 ## Tulosveikkaus
@@ -60,7 +55,7 @@ Alla yhteenveto eri osuuksissa saatavista pisteistä.
 |--------------------------	|----------------------------------	|
 | Tulosveikkaus            	| 2 $\times$ kertoimien summa[^3]. 	|
 | Alkulohkojen sijoitukset 	| 64                               	|
-| Pudotuspelipuu           	| 114                              	|
+| Pudotuspelipuu           	| 104                              	|
 | Pelaajavalinnat          	| 98                               	|
 
 

@@ -60,7 +60,7 @@ Alla yhteenveto eri osuuksissa saatavista pisteistä.
 |--------------------------	|----------------------------------	|
 | Tulosveikkaus            	| 2 $\times$ kertoimien summa[^3]. 	|
 | Alkulohkojen sijoitukset 	| 64                               	|
-| Pudotuspelipuu           	| 114                              	|
+| Pudotuspelipuu           	| 104                              	|
 | Pelaajavalinnat          	| 98                               	|
 
 

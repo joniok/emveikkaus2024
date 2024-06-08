@@ -1,0 +1,568 @@
+---
+title: "Kaikkien aikojen EM-futisveikkaus 2024"
+output: html_document
+---
+
+```{r pkgs, echo=FALSE, include=TRUE, message = FALSE}
+pacman::p_load(googledrive, 
+               googlesheets4, 
+               tidyverse, 
+               janitor,
+               emoji,
+               knitr, 
+               kableExtra)
+
+```
+
+
+```{r global_vars, include=FALSE}
+current_date <- format(Sys.Date(), "%d.%m.%Y")
+current_time <- format(Sys.time(), "%H.%M")
+source("funs.R")
+source("wikipedia_scraper.R")
+options(dplyr.summarise.inform = FALSE)
+```
+
+**Viimeksi päivitetty**: `r current_date` klo `r current_time`
+
+```{r auth, message=FALSE, include=FALSE}
+gs4_auth(email = TRUE)
+```
+
+```{r data, echo = FALSE, include=FALSE}
+results <- googledrive::drive_get("em2024-results") %>%
+  read_sheet(col_types = "c") %>%
+  separate(col = "Tulos", into = c("home.goals", "away.goals"), sep = "-", remove = FALSE, fill = "right", convert = TRUE) %>%
+  mutate(Merkki = ifelse(home.goals == away.goals, "X", 
+                         ifelse(home.goals > away.goals, "1",
+                                ifelse(home.goals < away.goals, "2", "-")))) 
+
+all_games <- results %>% select(Nro, game.id)
+
+score_evaluation <- results %>%
+  pivot_longer(cols = c("1", "X", "2"), names_to = "odds.labels", values_to = "Kerroin") %>%
+  filter(Merkki == odds.labels) %>%
+  select(Nro, game.id, Koti, Vieras, Tulos, Merkki, Kerroin)
+
+write.csv(score_evaluation, "points/evaluation.csv", row.names = FALSE)
+
+# add flags
+results <- results %>%
+  left_join(flags() %>% rename(home_flag = flag), by = c("Koti" = "Joukkue")) %>%
+  left_join(flags() %>% rename(away_flag = flag), by = c("Vieras" = "Joukkue")) %>%
+  unite("Koti", c("home_flag", "Koti"), sep = " ") %>%
+  unite("Vieras", c("away_flag", "Vieras"), sep = " ")
+
+
+player_points <- player_selections_points("points/player_selections.csv")
+
+group_stage_finished <- sum(!is.na(results$Tulos)) == nrow(results) & sum(!is.na(results$Tulos)) > 0
+evaluate_group_stage <- any(evaluate_groups)
+
+player_awards <- TRUE
+```
+
+```{r data-playoff, include = FALSE, eval = group_stage_finished}
+bracket <- googledrive::drive_get("mm2022-results") %>%
+  read_sheet(sheet = 2) 
+
+if(!file.exists("odds/scores.csv")){
+  googledrive::drive_get("mm2022-results") %>%
+    read_sheet(sheet = 3) %>% 
+    write.csv("odds/scores.csv", row.names = FALSE)
+}
+
+playoff_stage <-  playoff_stage_fun(bracket$Voittaja)
+
+next_stage <- ifelse(playoff_stage != "Finaali", 
+                     unique(bracket$Vaihe)[(which(unique(bracket$Vaihe) == playoff_stage) +1)],
+                     "Finaali")
+
+new_user_brackets <- FALSE
+
+if(new_user_brackets) {
+  user_brackets %>%
+    user_brackets_table() %>%
+    write.csv("user_brackets.csv", row.names = FALSE)
+  
+}  else { 
+  top4_manual <- read.csv("user_brackets_final.csv") %>% 
+    pivot_longer(-Joukkue, names_to = "Nimi", values_to = "Sij") %>%
+    filter(Sij %in% c("Kultaa", "Hopeaa", "Pronssia", "4. sija"))
+  
+}
+
+if(playoff_stage != "Välierät" | playoff_stage != "Finaali"){
+  coming_stage <- unique(bracket$Vaihe)[(which(unique(bracket$Vaihe) == next_stage) +1)]
+} else {
+  coming_stage <- NA
+}
+```
+
+```{r users, include=FALSE}
+players <- c("Joni", "Juha", "Make", "Miku","Patrik", "Reni", "Rikson", "Santeri")
+
+group_labels <- rep(4, 8)
+names(group_labels) <- paste("Lohko", LETTERS[1:8])
+
+user_files <- list.files("users/", full.names = TRUE)
+
+users <- user_files %>% 
+  str_extract_all(pattern = paste(players, collapse = "|")) %>%
+  unlist()
+
+user_pts <- paste(users, "pts", sep = ".")
+
+
+scores <- lapply(user_files, get_user, eval_df = score_evaluation, pts_only = FALSE) %>% 
+  purrr::reduce(left_join, by = "game.id")
+
+if(!file.exists("odds/user_scores.csv")) {
+  scores %>%
+    select(game.id, all_of(users)) %>%
+    write.csv("odds/user_scores.csv", row.names = FALSE)
+}
+
+user_totals <- lapply(user_files, get_user, eval_df = score_evaluation, pts_only = TRUE) %>% 
+  bind_rows() %>%
+  relocate(Nimi, .before = 1) %>%
+  arrange(desc(Pts))
+
+# Some dynamic indicators for R Markdown
+next_date <- results %>% 
+  filter(is.na(Tulos)) %>% 
+  slice_head(n=1) %>% 
+  select(Pvm) %>%
+  as.character()
+```
+
+
+```{r group-stage-positions, include=FALSE}
+user_brackets <- lapply(user_files, get_playoff_bracket, country_names = as.character(country_codes()$fi)) %>%
+  bind_rows() %>%
+  left_join(top4_manual, by = c("Nimi", "Joukkue")) %>%
+  mutate(fix_top4 = ifelse((Vaihe == "Välierät" & Sij == "Pronssia") | (Vaihe == "Välierät" & Sij == "4. sija"), 1, 0)) %>%
+  filter(fix_top4 < 1 ) %>%
+  select(-Sij, -fix_top4)
+
+user_bracket_pts <- user_brackets %>% 
+  bracket_points() 
+
+user_positions <- lapply(user_files, get_user_positions) %>%
+  bind_rows() 
+
+if(evaluate_group_stage){
+  # Group stage positions
+  true_positions <- read.csv("points/group_stage.csv") %>%
+    mutate_if(is.character, readr::parse_guess)
+  
+  group_stage_pts <- user_position_points(user_positions, true_positions, write = TRUE)
+}
+
+
+if(group_stage_finished & sum(!is.na(bracket$Voittaja > 1))) {
+  bracket_pts <- bracket %>%
+    filter(!is.na(Voittaja)) %>%
+    mutate(Pts = unlist(lapply(Vaihe, bracket_points_by_stage))) %>%
+    left_join(user_bracket_pts, by = c("Joukkue", "Vaihe", "Pts")) %>%
+    filter(!is.na(Nimi)) %>%
+    group_by(Nimi) %>%
+    summarise(Pudot = sum(Pts))
+}  
+
+if (!group_stage_finished & !evaluate_group_stage) {
+  overall <- user_totals
+} else if (any(evaluate_group_stage) == FALSE) {
+  overall <- user_totals %>%
+    select(Nimi, Pts) %>%
+    rename(Tulos = Pts) %>%
+    left_join(group_stage_pts, by = "Nimi") %>%
+    mutate(Pts = rowSums(select_if(., is.numeric), na.rm = TRUE)) %>% 
+    arrange(desc(Pts)) 
+} else {
+  overall <- user_totals %>%
+    select(Nimi, Pts) %>%
+    rename(Tulos = Pts) %>%
+    left_join(group_stage_pts, by = "Nimi") %>%
+    left_join(bracket_pts, by = "Nimi") %>%
+    left_join(player_points, by = "Nimi") %>%
+    mutate(Pts = rowSums(select_if(., is.numeric), na.rm = TRUE)) %>% 
+    arrange(desc(Pts)) 
+}
+
+```
+
+## Kokonaiskisa {.tabset}
+
+`r ifelse(evaluate_group_stage, "### Yhteispisteet", "")`
+
+```{r barplot, echo=FALSE, fig.width=5, fig.height=4, out.extra='style="float:left; padding:10px"', eval = evaluate_group_stage}
+
+if(!player_awards) {
+  overall$Pelaaj <- NULL
+}
+
+overall %>%  
+  select(-Pts) %>%
+  pivot_longer(cols = colnames(Filter(is.numeric, .)), names_to = "stat", values_to = "Pts") %>%
+  ggplot() +
+  aes(x = Nimi, y = Pts, fill = stat, label = Pts) +
+  geom_bar(stat = "identity")  +
+  geom_text(position = position_stack(vjust = 0.5), size = 3) + 
+  # scale_x_discrete(guide = guide_axis(n.dodge = 2)) +
+  theme_minimal() +
+  theme(legend.position = "bottom") +
+  labs(x="", y= "Pisteet", title =paste("Tilanne:", current_date), fill = "") 
+#scale_fill_discrete(name = "", labels = c("Lohkosijoitukset", "Pelaajavalinnat", "Pudotuspelipuu", "Tulosveikkaus"))
+```
+
+```{r line_plot_data, include=FALSE}
+zero_counts <- data.frame(Nro = rep(0,length(users)), 
+                          Nimi = users,
+                          Pts = rep(0,length(users)))
+
+line_plot_data <- results %>%
+  left_join(scores, by = "game.id") %>%
+  filter(!is.na(Tulos)) %>%
+  select(Nro, all_of(user_pts)) %>%
+  mutate_all(as.numeric) %>%
+  pivot_longer(cols = all_of(user_pts), names_to = "Nimi", values_to = "Pts") %>%
+  bind_rows(zero_counts) %>%
+  mutate(Nimi = stringr::str_remove(Nimi, ".pts")) %>%
+  group_by(Nimi) %>%
+  arrange(Nro) %>%
+  summarise(Pts = cumsum(Pts), Nro = Nro)
+```
+
+```{r overall_table, echo=FALSE, out.extra='style="float:right; padding:10px"', eval = evaluate_group_stage}
+bold_col_idx <- which(colnames(overall) == "Pts")
+
+overall %>% 
+  mutate(Ero = abs(c(0, diff(overall$Pts)))) %>%
+  kable() %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE, position = "center") %>%
+  column_spec(bold_col_idx, bold = TRUE)
+```
+
+<br />
+<br />
+
+**Tulos** = Tulosveikkaus  
+**Lohko** = Alkulohkojen sijoitukset oikein (2p/joukkue)  
+**Pudot** = Pudotuspelipuu  
+**Pelaaj** = Pelaajavalinnat  
+**Ero ** = Ero edeltävään  
+
+***
+
+`r ifelse(evaluate_group_stage, "### Tulosveikkaus", "")`
+
+```{r line_plot, echo=FALSE, warning = FALSE, fig.width=5, fig.height=4, out.extra='style="float:left; padding:10px"', eval = evaluate_group_stage}
+line_plot_data %>% 
+  ggplot() + 
+  aes(x = Nro, y= Pts, col = Nimi) + 
+  geom_line(linewidth = 1) + 
+  labs(title = paste("Tilanne", current_date),
+       x = "Ottelut", y ="Pisteet",
+       col = "", linetype = "") +
+  scale_x_continuous(breaks= scales::pretty_breaks(), limits = c(0,nrow(scores))) +
+  scale_y_continuous(breaks = scales::pretty_breaks(), limits = c(0, NA)) +
+  theme_minimal() +
+  theme(legend.position='top')
+```
+
+```{r status_data, echo=FALSE, warning = FALSE, fig.width=5, fig.height=4, out.extra='style="float:left; padding:10px"', eval = !evaluate_group_stage}
+
+line_plot_data %>% 
+  #group_by(Nimi) %>%
+  filter(Nro == max(Nro)) %>%
+  ggplot() + 
+  aes(x = Nimi, y= Pts, fill = Nimi) + 
+  geom_bar(stat = "identity") +
+  geom_text(aes(label = Pts, col = Nimi), position = position_stack(vjust = 1.1), size = 3) + 
+  labs(title = paste("Tilanne", current_date),
+       x = "", y ="Pisteet",
+       col = "", linetype = "") +
+  theme_minimal() +
+  theme(legend.position='none')
+```
+
+```{r stats, echo=FALSE, out.extra='style="float:right; padding:10px"'}
+user_totals %>%
+  mutate(Ero = abs(c(0, diff(user_totals$Pts)))) %>%
+  kable() %>%
+  kable_styling(bootstrap_options = c("striped", "hover"), full_width = FALSE, position = "center") %>%
+  column_spec(5, bold = TRUE)  %>%
+  column_spec(6, italic = TRUE)
+```
+
+<br />
+<br />
+
+**Tulos** = Täysin oikea tulos, kaksi kertaa kertoimen verran pisteitä  
+**1X2** = Oikea vakiomerkki, kertoimen verran pisteitä  
+**Kert** = Kertoimista saadut pisteet yhteensä  
+**Pts** = Pisteet yhteensä  
+**Ero** = Ero edeltävään  
+
+***
+
+
+```{r scores_formattings, echo=FALSE, include=FALSE}
+results_table <- results %>%
+  left_join(scores, by = "game.id") %>%
+  mutate_at(vars(`1`, X, `2`), format_num) %>%  
+  mutate(
+    Koti = cell_spec(Koti, bold = ifelse(Merkki == "1",TRUE, FALSE), italic = ifelse(Merkki == "X", TRUE, FALSE)),
+    
+    Vieras = cell_spec(Vieras, bold = ifelse(Merkki == "2",TRUE, FALSE), italic = ifelse(Merkki == "X", TRUE, FALSE)),
+    
+    `1` = cell_spec(`1`, bold = ifelse(Merkki == "1",TRUE, FALSE)),
+    
+    X = cell_spec(X, bold = ifelse(Merkki == "X",TRUE, FALSE)),
+    
+    `2` = cell_spec(`2`, bold = ifelse(Merkki == "2",TRUE, FALSE))
+  ) %>%
+  select(-game.id, -home.goals, -away.goals) %>%
+  mutate_all(as.character) %>%
+  mutate_all(replace_na, replace = "-")
+```
+
+`r ifelse(group_stage_finished, "# Pudotuspelit  {.tabset}", "")`
+
+`r ifelse(group_stage_finished, paste("##", playoff_stage), "")`
+
+`r ifelse(group_stage_finished, paste0("**", bracket_points_by_stage(playoff_stage),"p / joukkue**"), "")`
+
+```{r bracket, echo=FALSE, eval = group_stage_finished}
+
+if(next_stage == "Pronssiottelu" & !is.na(next_stage)) {
+  next_stage <- "Finaali"
+  
+  winner_selections <- user_brackets %>% 
+    filter(Vaihe == playoff_stage) %>% 
+    select(-Vaihe)
+  
+} else {
+  winner_selections <- user_brackets %>% 
+    filter(Vaihe == next_stage) %>% 
+    select(-Vaihe)
+}
+
+playoff_round <- bracket %>%
+  filter(Vaihe == playoff_stage) %>%
+  left_join(winner_selections, by = "Joukkue") %>%
+  mutate(Nimi = replace_na(Nimi, "-")) %>%
+  mutate(Voittaja = ifelse(is.na(Voittaja), 0, Voittaja)) %>%
+  mutate(Nimi = cell_spec(Nimi, bold = ifelse(Voittaja == 1, TRUE, FALSE))) %>%
+  group_by(id, Vaihe, Joukkue, Voittaja) %>%
+  summarise(Nimi = paste(Nimi, collapse = ", ")) %>%
+  arrange(id, Joukkue) %>%
+  ungroup() %>%
+  left_join(flags(), by = "Joukkue") %>%
+  mutate(Joukkue = paste(flag, cell_spec(Joukkue, bold = ifelse(Voittaja == 1, TRUE, FALSE)))) %>%
+  select(-flag, -Vaihe, -Voittaja)
+
+bracket_labels = rep(2, length(unique(playoff_round$id)))
+names(bracket_labels) <- as.character(min(playoff_round$id):max(playoff_round$id))
+
+playoff_round %>%
+  select(-id) %>%
+  knitr::kable(escape = FALSE) %>%
+  kable_styling(bootstrap_options = c("striped")) %>%
+  pack_rows(index = bracket_labels)
+```
+
+`r ifelse(group_stage_finished & next_stage != "Finaali", paste("##", next_stage), "")`
+
+`r ifelse(group_stage_finished & next_stage != "Finaali", paste0("**", bracket_points_by_stage(next_stage),"p / joukkue**"), "")`
+
+```{r bracket_next, echo=FALSE, eval = exists("bracket") & group_stage_finished & next_stage != "Finaali"}
+
+advanced_teams <- bracket %>% 
+  filter(Vaihe == next_stage) %>% 
+  filter(!is.na(Joukkue)) %>%
+  distinct(Joukkue) %>%
+  pull(Joukkue)
+
+if(length(advanced_teams) > 0) {
+  
+  winner_status <- ifelse(next_stage != "Finaali", 
+                          unique(bracket$Vaihe)[(which(unique(bracket$Vaihe) == next_stage) +1)],
+                          "Finaali")
+  
+  next_playoff_round <-  bracket %>%
+    filter(Vaihe == next_stage, !is.na(Joukkue)) %>%
+    left_join(user_brackets %>% 
+                filter(Vaihe == winner_status) %>% 
+                filter(Joukkue %in% advanced_teams) %>%
+                select(-Vaihe), by = "Joukkue") %>%
+    group_by(id, Vaihe, Joukkue) %>%
+    summarise(Nimi = paste(Nimi, collapse = ", ")) %>%
+    ungroup() %>%
+    select(-Vaihe) %>%
+    left_join(flags(), by = "Joukkue") %>%
+    mutate(Nimi = ifelse(Nimi == "NA", "-", Nimi)) %>%
+    mutate(Joukkue = paste(flag, Joukkue))
+  
+  next_bracket_labels = as.integer(table(next_playoff_round$id))
+  
+  names(next_bracket_labels) <- as.character(min(next_playoff_round$id):max(next_playoff_round$id))
+  
+  next_playoff_round %>%
+    select(-id, -flag) %>%
+    knitr::kable(escape = FALSE) %>%
+    kable_styling(bootstrap_options = c("striped")) %>%
+    pack_rows(index = next_bracket_labels)
+}
+```
+
+```{r next-phase, echo = FALSE, eval = !group_stage_finished}
+results_table %>% 
+  filter(Pvm == next_date) %>%
+  select(-contains("pts"), -Merkki, -Nro, -Pvm) %>% 
+  pivot_longer(cols = all_of(users), names_to = "Nimi", values_to = "Veikkaus") %>%
+  mutate(Merkki = add_symbol(Veikkaus)) %>%
+  pivot_longer(cols = c("1", "X", "2"), names_to = "Kerroinmerkki", values_to = "Kerroin") %>%
+  filter(Kerroinmerkki == Merkki) %>%
+  mutate(Veikkaus = paste(Veikkaus, paste0("[",Kerroin,"]"))) %>%
+  select(-Merkki, -Kerroinmerkki, -Kerroin) %>%
+  pivot_wider(values_from = "Veikkaus", names_from="Nimi") %>%
+  kable(escape = FALSE) %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = FALSE)
+```
+
+# Ottelut ja tulokset {.tabset}
+
+`r ifelse(!group_stage_finished , paste("**Seuraavat ottelut ", next_date, "**"), "")`
+
+```{r next-matches, echo = FALSE, eval = !group_stage_finished}
+
+results_table %>% 
+  filter(Pvm == next_date) %>%
+  select(-contains("pts"), -Merkki, -Nro, -Pvm) %>% 
+  pivot_longer(cols = all_of(users), names_to = "Nimi", values_to = "Veikkaus") %>%
+  mutate(Merkki = add_symbol(Veikkaus)) %>%
+  pivot_longer(cols = c("1", "X", "2"), names_to = "Kerroinmerkki", values_to = "Kerroin") %>%
+  filter(Kerroinmerkki == Merkki) %>%
+  mutate(Veikkaus = paste(Veikkaus, paste0("[",Kerroin,"]"))) %>%
+  select(-Merkki, -Kerroinmerkki, -Kerroin) %>%
+  pivot_wider(values_from = "Veikkaus", names_from="Nimi") %>%
+  kable(escape = FALSE) %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = TRUE, position = "left")
+```
+
+
+
+## Tiivis
+
+```{r progress, include = FALSE}
+current_bar <- round(sum(!is.na(results$Tulos))/nrow(results)*100)
+progress_bar <- paste0("![](https://progress-bar.dev/", current_bar, ")")
+```
+
+`r progress_bar` Alkusarjaa pelattu  `r sum(!is.na(results$Tulos))`/`r nrow(results)`
+
+```{r compact_table, echo=FALSE}
+results_table %>%
+  mutate(Joni = ifelse(Tulos != "-", highlight_col(Joni.pts), Joni)) %>%
+  mutate(Juha = ifelse(Tulos != "-", highlight_col(Juha.pts), Juha)) %>%
+  mutate(Make = ifelse(Tulos != "-", highlight_col(Make.pts), Make)) %>%
+  mutate(Miku = ifelse(Tulos != "-", highlight_col(Miku.pts), Miku)) %>%
+  mutate(Patrik = ifelse(Tulos != "-", highlight_col(Patrik.pts), Patrik)) %>%
+  mutate(Reni = ifelse(Tulos != "-", highlight_col(Reni.pts), Reni)) %>%
+  mutate(Rikson = ifelse(Tulos != "-", highlight_col(Rikson.pts), Rikson)) %>%
+  mutate(Santeri = ifelse(Tulos != "-", highlight_col(Santeri.pts), Santeri)) %>%
+  select(-Pvm, -Klo, - Merkki, -all_of(user_pts)) %>%
+  kable(escape = FALSE) %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = TRUE)
+```
+
+
+## Laaja
+
+```{r wide_table, echo=FALSE}
+wide_results_table <- results_table %>%
+  select(-Pvm, -Klo) %>%
+  mutate(Koti = substr(Koti, emoji_locate(Koti)[,1], emoji_locate(Koti)[,2])) %>%
+  mutate(Vieras = substr(Vieras, emoji_locate(Vieras)[,1], emoji_locate(Vieras)[,2]))
+
+player_regex <- paste0("(", paste(users, collapse = "|" ),")")
+
+colnames(wide_results_table) <- gsub(paste0(player_regex, "(?!.)"), "Tulos", colnames(wide_results_table), perl = TRUE)
+colnames(wide_results_table) <- gsub(paste0(player_regex,".pts"), "Pts", colnames(wide_results_table), perl = TRUE)
+
+user_header <- c(9, rep(2, length(users)))
+names(user_header) <- c(" ", users)
+
+wide_results_table%>%
+  kable(escape = FALSE) %>%
+  kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = TRUE, font_size = 11) %>%
+  add_header_above(header = user_header)
+```
+
+## Lohkosijoitus
+
+```{r position_table, echo = FALSE}
+
+if(!evaluate_group_stage) {
+  user_positions %>% 
+    left_join(flags(), by = c("Veikkaus" = "Joukkue")) %>%
+    unite("Veikkaus", c("flag", "Veikkaus"), sep = " ") %>%
+    pivot_wider(names_from = "Nimi", values_from = "Veikkaus") %>%
+    select(-Lohko) %>%
+    knitr::kable(escape = FALSE) %>%
+    kable_styling(bootstrap_options = c("striped"), full_width = FALSE) %>%
+    pack_rows(index = group_labels)
+} else {
+  
+  user_positions %>% 
+    left_join(true_positions, by = c("Sij", "Lohko")) %>%
+    mutate(Veikkaus = ifelse(Veikkaus==Joukkue & !is.na(Joukkue), cell_spec(paste(Veikkaus, "(2p)"), bold = TRUE), Veikkaus)) %>%
+    select(-Joukkue) %>%
+    pivot_wider(names_from = "Nimi", values_from = "Veikkaus") %>%
+    select(-Lohko) %>%
+    knitr::kable(escape = FALSE) %>%
+    kable_styling(bootstrap_options = c("striped"), full_width = FALSE) %>%
+    pack_rows(index = group_labels)
+  
+}
+```
+
+## Pudotuspelipuu
+
+```{r bracket_preview, echo = FALSE}
+
+if(file.exists("user_brackets_final.csv")) {
+  # make manual edits for top 4
+  bracket_preview <- read.csv("user_brackets_final.csv") %>%
+    pivot_longer(-Joukkue, names_to = "Nimi", values_to = "Sij") %>%
+    mutate(across(where(is.character), ~ na_if(.,""))) %>%
+    filter(!is.na(Sij)) %>%
+    left_join(flags(), by = "Joukkue") %>%
+    unite("Joukkue", c("flag", "Joukkue"), sep = " ") %>%
+    pivot_wider(id_cols = Sij, names_from = Nimi, values_from = Joukkue, values_fn = list) %>% 
+    unnest(cols = all_of(users)) %>%
+    slice(1,6,7,16,2:5,8:15) %>%
+    mutate(Sij = ifelse(Sij == "Kultaa", paste(emoji::emoji("1st_place_medal"), Sij), Sij)) %>%
+    mutate(Sij = ifelse(Sij == "Hopeaa", paste(emoji::emoji("2nd_place_medal"), Sij), Sij)) %>%
+    mutate(Sij = ifelse(Sij == "Pronssia", paste(emoji::emoji("bronze"), Sij), Sij))
+  
+  bracket_preview %>%
+    mutate(Sij = str_replace_all(Sij, "Puolivälierät|Neljännesvälierät", "")) %>%
+    kbl(escape = FALSE) %>%
+    kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = FALSE) %>%
+    row_spec(1, bold = TRUE) %>%
+    pack_rows("Finaali", 1, 2) %>%
+    pack_rows("Pronssiottelu", 3,4) %>%
+    pack_rows("Puolivälierät", 5, 8) %>%
+    pack_rows("Neljännesvälierät", 9, 16) %>%
+    row_spec(9:16, col = "lightgrey")
+  
+}
+```
+
+
+
+
+

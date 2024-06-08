@@ -1,0 +1,13 @@
+name: "Kaikkien aikojen EM-futisveikkaus 2024"
+output_dir: "."
+exclude: ["README.md"]
+navbar:
+  title: "Kaikkien aikojen EM-futisveikkaus 2024"
+  left:
+    - text: "Etusivu"
+      href: index.html
+    - text: "Säännöt"
+      href: rules.html
+output:
+  html_document:
+    theme: lumen

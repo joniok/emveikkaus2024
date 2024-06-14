@@ -26,7 +26,7 @@ options(dplyr.summarise.inform = FALSE)
 **Viimeksi päivitetty**: `r current_date` klo `r current_time`
 
 ```{r auth, message=FALSE, include=FALSE}
-gs4_auth(email = TRUE)
+drive_auth(email = TRUE)
 ```
 
 ```{r data, echo = FALSE, include=FALSE}
@@ -59,11 +59,11 @@ player_points <- player_selections_points("points/player_selections.csv")
 group_stage_finished <- sum(!is.na(results$Tulos)) == nrow(results) & sum(!is.na(results$Tulos)) > 0
 evaluate_group_stage <- any(evaluate_groups)
 
-player_awards <- TRUE
+player_awards <- FALSE
 ```
 
 ```{r data-playoff, include = FALSE, eval = group_stage_finished}
-bracket <- googledrive::drive_get("mm2022-results") %>%
+bracket <- googledrive::drive_get("em2024-results") %>%
   read_sheet(sheet = 2) 
 
 if(!file.exists("odds/scores.csv")){
@@ -78,19 +78,12 @@ next_stage <- ifelse(playoff_stage != "Finaali",
                      unique(bracket$Vaihe)[(which(unique(bracket$Vaihe) == playoff_stage) +1)],
                      "Finaali")
 
-new_user_brackets <- FALSE
 
-if(new_user_brackets) {
-  user_brackets %>%
-    user_brackets_table() %>%
-    write.csv("user_brackets.csv", row.names = FALSE)
+top4_manual <- read.csv("user_brackets_final.csv") %>% 
+  pivot_longer(-Joukkue, names_to = "Nimi", values_to = "Sij") %>%
+  filter(Sij %in% c("Kultaa", "Hopeaa", "Pronssia", "4. sija"))
   
-}  else { 
-  top4_manual <- read.csv("user_brackets_final.csv") %>% 
-    pivot_longer(-Joukkue, names_to = "Nimi", values_to = "Sij") %>%
-    filter(Sij %in% c("Kultaa", "Hopeaa", "Pronssia", "4. sija"))
-  
-}
+
 
 if(playoff_stage != "Välierät" | playoff_stage != "Finaali"){
   coming_stage <- unique(bracket$Vaihe)[(which(unique(bracket$Vaihe) == next_stage) +1)]
@@ -100,10 +93,10 @@ if(playoff_stage != "Välierät" | playoff_stage != "Finaali"){
 ```
 
 ```{r users, include=FALSE}
-players <- c("Joni", "Juha", "Make", "Miku","Patrik", "Reni", "Rikson", "Santeri")
+players <- c("Daniel", "Joni", "Juha", "Make", "Miku","Patrik", "Reni", "Riku", "Rikson", "Santeri")
 
-group_labels <- rep(4, 8)
-names(group_labels) <- paste("Lohko", LETTERS[1:8])
+group_labels <- rep(4, 6)
+names(group_labels) <- paste("Lohko", LETTERS[1:6])
 
 user_files <- list.files("users/", full.names = TRUE)
 
@@ -138,12 +131,27 @@ next_date <- results %>%
 
 
 ```{r group-stage-positions, include=FALSE}
+if(group_stage_finished == FALSE) {
+    top4_manual <- read.csv("user_brackets_final.csv") %>% 
+      pivot_longer(-Joukkue, names_to = "Nimi", values_to = "Sij") %>%
+      filter(Sij %in% c("Kultaa", "Hopeaa", "Pronssia", "4. sija"))
+}
+
 user_brackets <- lapply(user_files, get_playoff_bracket, country_names = as.character(country_codes()$fi)) %>%
   bind_rows() %>%
-  left_join(top4_manual, by = c("Nimi", "Joukkue")) %>%
-  mutate(fix_top4 = ifelse((Vaihe == "Välierät" & Sij == "Pronssia") | (Vaihe == "Välierät" & Sij == "4. sija"), 1, 0)) %>%
-  filter(fix_top4 < 1 ) %>%
-  select(-Sij, -fix_top4)
+ left_join(top4_manual, by = c("Nimi", "Joukkue")) %>%
+ #mutate(fix_top4 = ifelse((Vaihe == "Välierät" & Sij == "Pronssia") | (Vaihe == "Välierät" & Sij == "4. sija"), 1, 0)) %>%
+ #filter(fix_top4 < 1 ) %>%
+ select(-Sij) #, -fix_top4)
+  
+new_user_brackets <- FALSE
+
+if(new_user_brackets) {
+  user_brackets %>%
+    user_brackets_table() %>%
+    write.csv("user_brackets.csv", row.names = FALSE)
+  
+}
 
 user_bracket_pts <- user_brackets %>% 
   bracket_points() 
@@ -417,7 +425,7 @@ if(length(advanced_teams) > 0) {
 }
 ```
 
-```{r next-phase, echo = FALSE, eval = !group_stage_finished}
+```{r next-phase, echo = FALSE, eval = FALSE}
 results_table %>% 
   filter(Pvm == next_date) %>%
   select(-contains("pts"), -Merkki, -Nro, -Pvm) %>% 
@@ -428,7 +436,7 @@ results_table %>%
   mutate(Veikkaus = paste(Veikkaus, paste0("[",Kerroin,"]"))) %>%
   select(-Merkki, -Kerroinmerkki, -Kerroin) %>%
   pivot_wider(values_from = "Veikkaus", names_from="Nimi") %>%
-  kable(escape = FALSE) %>%
+  kbl(escape = FALSE) %>%
   kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = FALSE)
 ```
 
@@ -448,7 +456,7 @@ results_table %>%
   mutate(Veikkaus = paste(Veikkaus, paste0("[",Kerroin,"]"))) %>%
   select(-Merkki, -Kerroinmerkki, -Kerroin) %>%
   pivot_wider(values_from = "Veikkaus", names_from="Nimi") %>%
-  kable(escape = FALSE) %>%
+  kbl(escape = FALSE) %>%
   kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = TRUE, position = "left")
 ```
 
@@ -465,16 +473,19 @@ progress_bar <- paste0("![](https://progress-bar.dev/", current_bar, ")")
 
 ```{r compact_table, echo=FALSE}
 results_table %>%
+  mutate(Daniel = ifelse(Tulos != "-", highlight_col(Daniel.pts), Daniel)) %>%
   mutate(Joni = ifelse(Tulos != "-", highlight_col(Joni.pts), Joni)) %>%
   mutate(Juha = ifelse(Tulos != "-", highlight_col(Juha.pts), Juha)) %>%
   mutate(Make = ifelse(Tulos != "-", highlight_col(Make.pts), Make)) %>%
   mutate(Miku = ifelse(Tulos != "-", highlight_col(Miku.pts), Miku)) %>%
   mutate(Patrik = ifelse(Tulos != "-", highlight_col(Patrik.pts), Patrik)) %>%
-  mutate(Reni = ifelse(Tulos != "-", highlight_col(Reni.pts), Reni)) %>%
-  mutate(Rikson = ifelse(Tulos != "-", highlight_col(Rikson.pts), Rikson)) %>%
+  #mutate(Reni = ifelse(Tulos != "-", highlight_col(Reni.pts), Reni)) %>%
+  #mutate(Riku = ifelse(Tulos != "-", highlight_col(Riku.pts), Riku)) %>%
+  #mutate(Rikson = ifelse(Tulos != "-", highlight_col(Rikson.pts), Rikson)) %>%
   mutate(Santeri = ifelse(Tulos != "-", highlight_col(Santeri.pts), Santeri)) %>%
   select(-Pvm, -Klo, - Merkki, -all_of(user_pts)) %>%
-  kable(escape = FALSE) %>%
+  kbl(escape = FALSE) %>%
+  #kable(escape = FALSE) %>%
   kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = TRUE)
 ```
 
@@ -496,7 +507,7 @@ user_header <- c(9, rep(2, length(users)))
 names(user_header) <- c(" ", users)
 
 wide_results_table%>%
-  kable(escape = FALSE) %>%
+  kbl(escape = FALSE) %>%
   kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = TRUE, font_size = 11) %>%
   add_header_above(header = user_header)
 ```
@@ -511,7 +522,7 @@ if(!evaluate_group_stage) {
     unite("Veikkaus", c("flag", "Veikkaus"), sep = " ") %>%
     pivot_wider(names_from = "Nimi", values_from = "Veikkaus") %>%
     select(-Lohko) %>%
-    knitr::kable(escape = FALSE) %>%
+    kbl() %>%
     kable_styling(bootstrap_options = c("striped"), full_width = FALSE) %>%
     pack_rows(index = group_labels)
 } else {
@@ -522,7 +533,7 @@ if(!evaluate_group_stage) {
     select(-Joukkue) %>%
     pivot_wider(names_from = "Nimi", values_from = "Veikkaus") %>%
     select(-Lohko) %>%
-    knitr::kable(escape = FALSE) %>%
+    kbl() %>%
     kable_styling(bootstrap_options = c("striped"), full_width = FALSE) %>%
     pack_rows(index = group_labels)
   
@@ -543,10 +554,11 @@ if(file.exists("user_brackets_final.csv")) {
     unite("Joukkue", c("flag", "Joukkue"), sep = " ") %>%
     pivot_wider(id_cols = Sij, names_from = Nimi, values_from = Joukkue, values_fn = list) %>% 
     unnest(cols = all_of(users)) %>%
-    slice(1,6,7,16,2:5,8:15) %>%
-    mutate(Sij = ifelse(Sij == "Kultaa", paste(emoji::emoji("1st_place_medal"), Sij), Sij)) %>%
-    mutate(Sij = ifelse(Sij == "Hopeaa", paste(emoji::emoji("2nd_place_medal"), Sij), Sij)) %>%
-    mutate(Sij = ifelse(Sij == "Pronssia", paste(emoji::emoji("bronze"), Sij), Sij))
+    arrange(Sij) %>%
+    slice(2,1, 15:16, 11:14, 3:10 ) %>%
+    mutate(Sij = ifelse(Sij == "Kultaa", paste(emoji::emoji("1st_place_medal"), Sij), Sij)) #%>%
+    #mutate(Sij = ifelse(Sij == "Hopeaa", paste(emoji::emoji("2nd_place_medal"), Sij), Sij)) %>%
+    #mutate(Sij = ifelse(Sij == "Pronssia", paste(emoji::emoji("bronze"), Sij), Sij))
   
   bracket_preview %>%
     mutate(Sij = str_replace_all(Sij, "Puolivälierät|Neljännesvälierät", "")) %>%
@@ -554,7 +566,7 @@ if(file.exists("user_brackets_final.csv")) {
     kable_styling(bootstrap_options = c("striped", "hover", "condensed"), full_width = FALSE) %>%
     row_spec(1, bold = TRUE) %>%
     pack_rows("Finaali", 1, 2) %>%
-    pack_rows("Pronssiottelu", 3,4) %>%
+    pack_rows("Välierät", 3,4) %>%
     pack_rows("Puolivälierät", 5, 8) %>%
     pack_rows("Neljännesvälierät", 9, 16) %>%
     row_spec(9:16, col = "lightgrey")

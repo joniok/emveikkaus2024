@@ -6,6 +6,8 @@ navbar:
   left:
     - text: "Etusivu"
       href: index.html
+    - text: "Valinnat"
+      href: selections.html
     - text: "Säännöt"
       href: rules.html
 output:

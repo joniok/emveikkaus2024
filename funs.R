@@ -108,6 +108,14 @@ get_flag <- function(cnt) {
     cnt <- "us"
   }
   
+  if(str_detect(cnt, "Turkey")) {
+    cnt <- "tr"
+  }
+  
+  # if(str_detect(cnt, "Czech Republic")) {
+  #   cnt <- "cz"
+  # }
+  
   name <- str_replace(tolower(cnt), " ", "_")
   flag <- emoji(name)
   
@@ -221,7 +229,7 @@ get_user_positions <- function(file){
     slice(-(1:4)) %>%
     rename(Sij = 1, Veikkaus = 2) %>%
     filter(Veikkaus != "") %>%
-    mutate(Lohko = rep(LETTERS[1:8], each = 4),
+    mutate(Lohko = rep(LETTERS[1:6], each = 4),
            Nimi = name) %>%
     mutate_if(is.character, readr::parse_guess)
   
@@ -257,8 +265,8 @@ get_playoff_bracket <- function(file, country_names){
     dplyr::rename(Neljännesvälierät= 1,
                   Puolivälierät = 2,
                   Välierät = 3,
-                  Pronssiottelu = 4,
-                  Finaali = 5) %>%
+                  #Pronssiottelu = 4,
+                  Finaali = 4) %>%
     filter(if_any(everything(), ~ . %in% country_names)) %>%
     mutate(across(where(is.character), ~ na_if(.,""))) %>%
     janitor::remove_empty("rows") %>%
@@ -293,8 +301,8 @@ bracket_points <- function(df) {
     mutate(Pts = unlist(lapply(Vaihe, bracket_points_by_stage))) %>%
     pivot_wider(id_cols = c("Nimi", "Joukkue"), names_from = Vaihe, values_from = Pts) %>%
     filter(!is.na(Puolivälierät)) %>%
-    mutate(Puolivälierät = ifelse(is.na(Välierät), NA, Puolivälierät)) %>%
-           #Välierät = ifelse(is.na(Pronssiottelu) & is.na(Finaali) , NA, Välierät)) %>%
+    mutate(Puolivälierät = ifelse(is.na(Välierät), NA, Puolivälierät),
+           Välierät = ifelse(is.na(Finaali) , NA, Välierät)) %>%
     pivot_longer(cols = -c("Nimi", "Joukkue"),names_to = "Vaihe", values_to = "Pts") %>% 
     filter(!is.na(Pts))
   
@@ -308,8 +316,6 @@ bracket_points_viridis <- function(x){
     stage_pts <- 0.4
   } else if (x == "Välierät"){
     stage_pts <- 0.6
-  } else if (x == "Pronssiottelu"){
-    stage_pts <- 0.8
   } else if(x == "Finaali"){
     stage_pts <- 1
   } else {

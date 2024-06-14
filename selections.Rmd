@@ -1,0 +1,29 @@
+---
+title: "Pelaajavalinnat"
+output: html_document
+---
+
+```{r pkgs, include=FALSE}
+pacman::p_load(tidyverse, rvest, knitr, kableExtra)
+```
+
+```{r selected-players-data, include=FALSE}
+selections <- read.csv("points/player_selections.csv", stringsAsFactors = FALSE) %>%
+  filter(Valinta != "") %>%
+  group_by(Kohde, Pts, Valinta, Oikein) %>%
+  arrange(Kohde, Pts, Valinta) %>%
+  summarise(Nimi = paste(Nimi, collapse = ", "), .groups = "drop") %>%
+  mutate(Kohde = paste(Kohde, paste0("(", Pts, "p)"))) %>%
+  mutate(Valinta = ifelse(!is.na(Oikein), cell_spec(Valinta, bold = TRUE), Valinta)) %>%
+  select(-Oikein)
+```
+
+```{r table, echo = FALSE}
+row_labels = as.integer(table(selections$Kohde))
+names(row_labels) <- unique(selections$Kohde)
+selections %>%  
+  select(-Pts, -Kohde) %>%
+  kable(escape = FALSE) %>%
+  kable_styling(bootstrap_options = c("striped")) %>%
+  pack_rows(index = row_labels)
+```

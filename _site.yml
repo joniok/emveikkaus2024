@@ -12,4 +12,4 @@ navbar:
       href: rules.html
 output:
   html_document:
-    theme: flatly
+    theme: lumen

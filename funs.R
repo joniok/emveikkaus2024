@@ -185,6 +185,8 @@ get_user_data <- function(file) {
     select(1:13) %>%
     drop_na() %>%
     janitor::row_to_names(1) %>%
+    mutate(Tulos = stringr::str_replace_all(Tulos, "\\s", "")) %>% 
+    mutate(Merkki = add_symbol(Tulos)) %>%
     mutate_if(is.character, parse_guess) %>%
     pivot_longer(cols = c("1", "X", "2"), names_to = "odds.labels", values_to = "Kerroin") %>%
     filter(Merkki == odds.labels) %>%

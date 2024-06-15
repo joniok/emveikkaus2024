@@ -479,9 +479,9 @@ results_table %>%
   mutate(Make = ifelse(Tulos != "-", highlight_col(Make.pts), Make)) %>%
   mutate(Miku = ifelse(Tulos != "-", highlight_col(Miku.pts), Miku)) %>%
   mutate(Patrik = ifelse(Tulos != "-", highlight_col(Patrik.pts), Patrik)) %>%
-  #mutate(Reni = ifelse(Tulos != "-", highlight_col(Reni.pts), Reni)) %>%
-  #mutate(Riku = ifelse(Tulos != "-", highlight_col(Riku.pts), Riku)) %>%
-  #mutate(Rikson = ifelse(Tulos != "-", highlight_col(Rikson.pts), Rikson)) %>%
+  mutate(Reni = ifelse(Tulos != "-", highlight_col(Reni.pts), Reni)) %>%
+  mutate(Riku = ifelse(Tulos != "-", highlight_col(Riku.pts), Riku)) %>%
+  mutate(Rikson = ifelse(Tulos != "-", highlight_col(Rikson.pts), Rikson)) %>%
   mutate(Santeri = ifelse(Tulos != "-", highlight_col(Santeri.pts), Santeri)) %>%
   select(-Pvm, -Klo, - Merkki, -all_of(user_pts)) %>%
   kbl(escape = FALSE) %>%

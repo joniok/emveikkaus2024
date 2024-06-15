@@ -137,6 +137,7 @@ get_user <- function(file, eval_df, game.ids = all_games, pts_only = TRUE, bets 
     drop_na() %>%
     janitor::row_to_names(1) %>%
     mutate(Tulos = stringr::str_replace_all(Tulos, "\\s", "")) %>% 
+    mutate(Merkki = add_symbol(Tulos)) %>%
     left_join(game.ids, by  = "Nro") %>%
     mutate_if(is.character, parse_guess) %>%
     pivot_longer(cols = c("1", "X", "2"), names_to = "odds.labels", values_to = "Kerroin") %>%
@@ -150,6 +151,7 @@ get_user <- function(file, eval_df, game.ids = all_games, pts_only = TRUE, bets 
     mutate(multiplier = ifelse(oma.tulos == Tulos, 2, 1)) %>% 
     mutate(kerroin.pts = ifelse(oma.merkki == Merkki, as.numeric(Kerroin), 0)) %>%
     mutate(Pts = multiplier * kerroin.pts)
+  
   
   if(pts_only == FALSE){
     

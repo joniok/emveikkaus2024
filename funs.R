@@ -136,6 +136,7 @@ get_user <- function(file, eval_df, game.ids = all_games, pts_only = TRUE, bets 
     select(1:13) %>%
     drop_na() %>%
     janitor::row_to_names(1) %>%
+    mutate(Tulos = stringr::str_replace_all(Tulos, "\\s", "")) %>% 
     left_join(game.ids, by  = "Nro") %>%
     mutate_if(is.character, parse_guess) %>%
     pivot_longer(cols = c("1", "X", "2"), names_to = "odds.labels", values_to = "Kerroin") %>%

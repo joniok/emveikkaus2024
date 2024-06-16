@@ -62,7 +62,7 @@ evaluate_group_stage <- any(evaluate_groups)
 player_awards <- FALSE
 ```
 
-```{r data-playoff, include = FALSE, eval = group_stage_finished}
+```{r data-playoff, include = FALSE, eval = TRUE}
 bracket <- googledrive::drive_get("em2024-results") %>%
   read_sheet(sheet = 2) 
 

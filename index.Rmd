@@ -180,7 +180,7 @@ if(group_stage_finished & sum(!is.na(bracket$Voittaja > 1))) {
 
 if (!group_stage_finished & !evaluate_group_stage) {
   overall <- user_totals
-} else if (any(evaluate_group_stage) == FALSE) {
+} else if (any(evaluate_groups) == TRUE) {
   overall <- user_totals %>%
     select(Nimi, Pts) %>%
     rename(Tulos = Pts) %>%
@@ -533,7 +533,7 @@ if(!evaluate_group_stage) {
     select(-Joukkue) %>%
     pivot_wider(names_from = "Nimi", values_from = "Veikkaus") %>%
     select(-Lohko) %>%
-    kbl() %>%
+    kbl(escape = FALSE) %>%
     kable_styling(bootstrap_options = c("striped"), full_width = FALSE) %>%
     pack_rows(index = group_labels)
   

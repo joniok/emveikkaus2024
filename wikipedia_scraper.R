@@ -1,7 +1,7 @@
 library(rvest)
 library(tidyverse)
 
-base_url <- "https://fi.wikipedia.org/wiki/Jalkapallon_Euroopan-mestaruuskilpailut_2020#Alkulohkot"
+base_url <- "https://fi.wikipedia.org/wiki/Jalkapallon_Euroopan-mestaruuskilpailut_2024#Alkulohkot"
 
 tables <- base_url %>%
   read_html() %>%
@@ -20,7 +20,7 @@ positions <- lapply(tables[1:6], process_table) %>%
   bind_rows(.id = "Lohko") %>%
   mutate(Lohko = plyr::mapvalues(Lohko, from = as.character(1:6), to = LETTERS[1:6]))
 
-evaluate_groups <- c("A" = FALSE,
+evaluate_groups <- c("A" = TRUE,
                      "B" = FALSE,
                      "C" = FALSE,
                      "D" = FALSE,

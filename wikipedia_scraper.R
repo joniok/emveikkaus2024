@@ -21,7 +21,7 @@ positions <- lapply(tables[1:6], process_table) %>%
   mutate(Lohko = plyr::mapvalues(Lohko, from = as.character(1:6), to = LETTERS[1:6]))
 
 evaluate_groups <- c("A" = TRUE,
-                     "B" = FALSE,
+                     "B" = TRUE,
                      "C" = FALSE,
                      "D" = FALSE,
                      "E" = FALSE,

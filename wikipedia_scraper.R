@@ -23,7 +23,7 @@ positions <- lapply(tables[1:6], process_table) %>%
 evaluate_groups <- c("A" = TRUE,
                      "B" = TRUE,
                      "C" = FALSE,
-                     "D" = FALSE,
+                     "D" = TRUE,
                      "E" = FALSE,
                      "F" = FALSE)
 

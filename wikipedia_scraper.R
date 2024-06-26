@@ -24,7 +24,7 @@ evaluate_groups <- c("A" = TRUE,
                      "B" = TRUE,
                      "C" = TRUE,
                      "D" = TRUE,
-                     "E" = FALSE,
+                     "E" = TRUE,
                      "F" = FALSE)
 
 group_stage_positions <- positions %>%

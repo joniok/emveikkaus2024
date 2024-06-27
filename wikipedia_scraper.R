@@ -25,7 +25,7 @@ evaluate_groups <- c("A" = TRUE,
                      "C" = TRUE,
                      "D" = TRUE,
                      "E" = TRUE,
-                     "F" = FALSE)
+                     "F" = TRUE)
 
 group_stage_positions <- positions %>%
   select(Lohko, Sij., Joukkue) %>%

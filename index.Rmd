@@ -376,7 +376,7 @@ names(bracket_labels) <- as.character(min(playoff_round$id):max(playoff_round$id
 
 playoff_round %>%
   select(-id) %>%
-  knitr::kable(escape = FALSE) %>%
+  kbl(escape = FALSE) %>%
   kable_styling(bootstrap_options = c("striped")) %>%
   pack_rows(index = bracket_labels)
 ```
@@ -419,7 +419,7 @@ if(length(advanced_teams) > 0) {
   
   next_playoff_round %>%
     select(-id, -flag) %>%
-    knitr::kable(escape = FALSE) %>%
+    kbl(escape = FALSE) %>%
     kable_styling(bootstrap_options = c("striped")) %>%
     pack_rows(index = next_bracket_labels)
 }

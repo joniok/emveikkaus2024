@@ -220,8 +220,8 @@ overall %>%
   # scale_x_discrete(guide = guide_axis(n.dodge = 2)) +
   theme_minimal() +
   theme(legend.position = "bottom") +
-  labs(x="", y= "Pisteet", title =paste("Tilanne:", current_date), fill = "") 
-#scale_fill_discrete(name = "", labels = c("Lohkosijoitukset", "Pelaajavalinnat", "Pudotuspelipuu", "Tulosveikkaus"))
+  labs(x="", y= "Pisteet", title =paste("Tilanne:", current_date), fill = "") %>%
+  scale_fill_discrete(name = "", labels = c("Lohkosijoitukset", "Pelaajavalinnat", "Pudotuspelipuu", "Tulosveikkaus"))
 ```
 
 ```{r line_plot_data, include=FALSE}

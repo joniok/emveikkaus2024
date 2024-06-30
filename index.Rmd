@@ -180,11 +180,13 @@ if(group_stage_finished & sum(!is.na(bracket$Voittaja > 1))) {
 
 if (!group_stage_finished & !evaluate_group_stage) {
   overall <- user_totals
-} else if (any(evaluate_groups) == TRUE) {
+} else if (all(evaluate_groups) == TRUE) {
   overall <- user_totals %>%
     select(Nimi, Pts) %>%
     rename(Tulos = Pts) %>%
     left_join(group_stage_pts, by = "Nimi") %>%
+    left_join(bracket_pts, by = "Nimi") %>%
+    left_join(player_points, by = "Nimi") %>%
     mutate(Pts = rowSums(select_if(., is.numeric), na.rm = TRUE)) %>% 
     arrange(desc(Pts)) 
 } else {
@@ -192,8 +194,6 @@ if (!group_stage_finished & !evaluate_group_stage) {
     select(Nimi, Pts) %>%
     rename(Tulos = Pts) %>%
     left_join(group_stage_pts, by = "Nimi") %>%
-    left_join(bracket_pts, by = "Nimi") %>%
-    left_join(player_points, by = "Nimi") %>%
     mutate(Pts = rowSums(select_if(., is.numeric), na.rm = TRUE)) %>% 
     arrange(desc(Pts)) 
 }

@@ -212,8 +212,6 @@ playoff_stage_fun <- function(x){
     stage <- "Puolivälierät"
   } else if (indicator_count < 14){
     stage <- "Välierät"
-  } else if(indicator_count < 15){
-    stage <- "Pronssiottelu"
   } else {
     stage <- "Finaali"
   }

@@ -59,7 +59,7 @@ player_points <- player_selections_points("points/player_selections.csv")
 group_stage_finished <- sum(!is.na(results$Tulos)) == nrow(results) & sum(!is.na(results$Tulos)) > 0
 evaluate_group_stage <- any(evaluate_groups)
 
-player_awards <- FALSE
+player_awards <- TRUE
 ```
 
 ```{r data-playoff, include = FALSE, eval = TRUE}
@@ -131,7 +131,7 @@ next_date <- results %>%
 
 
 ```{r group-stage-positions, include=FALSE}
-if(group_stage_finished == FALSE) {
+if(group_stage_finished == TRUE) {
     top4_manual <- read.csv("user_brackets_final.csv") %>% 
       pivot_longer(-Joukkue, names_to = "Nimi", values_to = "Sij") %>%
       filter(Sij %in% c("Kultaa", "Hopeaa", "Pronssia", "4. sija"))
@@ -221,7 +221,7 @@ overall %>%
   theme_minimal() +
   theme(legend.position = "bottom") +
   labs(x="", y= "Pisteet", title =paste("Tilanne:", current_date), fill = "") %>%
-  scale_fill_discrete(name = "", labels = c("Lohkosijoitukset", "Pelaajavalinnat", "Pudotuspelipuu", "Tulosveikkaus"))
+  scale_fill_discrete(name = "", labels = c("Lohkosijoitus", "Pelaajavalinnat", "Pudotuspelit", "Tulosveikkaus"))
 ```
 
 ```{r line_plot_data, include=FALSE}
@@ -344,12 +344,13 @@ results_table <- results %>%
 
 ```{r bracket, echo=FALSE, eval = group_stage_finished}
 
-if(next_stage == "Pronssiottelu" & !is.na(next_stage)) {
-  next_stage <- "Finaali"
+if(next_stage == "Finaali" & !is.na(next_stage)) {
   
   winner_selections <- user_brackets %>% 
     filter(Vaihe == playoff_stage) %>% 
-    select(-Vaihe)
+    left_join(top4_manual, by = c("Nimi", "Joukkue")) %>%
+    filter(Sij == "Kultaa") %>%
+    select(-Vaihe, -Sij)
   
 } else {
   winner_selections <- user_brackets %>% 

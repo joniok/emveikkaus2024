@@ -23,7 +23,7 @@ row_labels = as.integer(table(selections$Kohde))
 names(row_labels) <- unique(selections$Kohde)
 selections %>%  
   select(-Pts, -Kohde) %>%
-  kable(escape = FALSE) %>%
+  kbl(escape = FALSE) %>%
   kable_styling(bootstrap_options = c("striped")) %>%
   pack_rows(index = row_labels)
 ```
